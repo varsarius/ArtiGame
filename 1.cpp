@@ -2,19 +2,115 @@
 #include <time.h>
 #include <SFML/Graphics.hpp>
 #include <SFML/Audio.hpp>
+#include <string>
 
-const int mapWidth = 100;
-const int mapHeight = 100;
-int cletca = 50;
-int WindowHeight = 768;
-int WindowWidth = 1024;
-int map[mapWidth][mapHeight];
+const int mapWidth = 100;///Нужно сделать:
+const int mapHeight = 100;// Подобрать размеры перса в пикселях и изначально рисовать столько пикселей, сколько нужно и не подбирать в программе масштаб
+int cletca = 50;//Подобрать анимацию на перса Артёма(хотя ещё не все спрайты пришли)
+int WindowHeight = 768;// Показать, как делается карта и сделать такую
+int WindowWidth = 1024;// Сделать уже более-менее презентабильный вид меню
+int map[mapWidth][mapHeight]; // Добавить врагов и логику взаимодействия с ними
 
-float x = 20;
-float y = 20;
-float speed = 1;
-float dx = 0;
-float dy = 0;
+class Player{
+public:
+  float x, y, dx, dy, speed, frame = 0;
+  int dir;
+  std::string File;
+  sf::Image image;
+  sf::Texture texture;
+  sf::Sprite sprite;
+  sf::SoundBuffer buffer;
+  sf::Sound sound;
+  Player(std::string F,std::string S, int X, int Y, int DX, int DY){
+    File = F;
+    image.loadFromFile(File);
+    image.createMaskFromColor(sf::Color(255,255,255));
+    texture.loadFromImage(image);
+    sprite.setTexture(texture);
+    sprite.setTextureRect(sf::IntRect(0,0,32,48));
+    sprite.scale(2,2);
+    buffer.loadFromFile("no-1.wav");
+    sound.setBuffer(buffer);
+    x = X;
+    y = Y;
+    dx = DX;
+    dy = DY;
+  }
+  void chdir(int DIR, float SPEED){
+    dir = DIR;
+    speed = SPEED;
+  }
+  void update(float time){
+    switch (dir){
+      case 0:
+        dx = speed;
+        dy = 0;
+        frame += 0.05 * time;
+        if(frame > 4) frame = 0;
+        sprite.setTextureRect(sf::IntRect(32*int(frame), 96, 32, 48));
+      break;
+      case 1:
+        dx = -speed;
+        dy = 0;
+        frame += 0.05 * time;
+        if(frame > 4) frame = 0;
+        sprite.setTextureRect(sf::IntRect(32*int(frame), 48, 32, 48));
+      break;
+      case 2:
+        dx = 0;
+        dy = speed;
+        frame += 0.05 * time;
+        if(frame > 4) frame = 0;
+        sprite.setTextureRect(sf::IntRect(32*int(frame), 0, 32, 48));
+      break;
+      case 3:
+        dx = 0;
+        dy = -speed;
+        frame += 0.05 * time;
+        if(frame > 4) frame = 0;
+        sprite.setTextureRect(sf::IntRect(32*int(frame), 144, 32, 48));
+      break;
+      case 4:
+        dx = -speed;
+        dy = -speed;
+      break;
+      case 5: dx = speed; dy = -speed; break;
+      case 6: dx = -speed; dy = speed; break;
+      case 7: dx = speed; dy = speed; break;
+
+      case -1:
+        dx = 0;
+        dy = 0;
+        frame += 0.05 * time;
+        if(frame > 2) frame = 0;
+        sprite.setTextureRect(sf::IntRect(0, 28*int(frame), 28, 28));
+      break;
+    }
+
+    x += dx*time;
+    y += dy*time;
+
+    //**** Столкновение с черным квадратом
+    for(int i = 0;i<mapHeight;i++){
+      for(int j = 0;j<mapWidth;j++){
+        if (map[i][j] == 1){
+          if(sf::IntRect(x, y, cletca, cletca).intersects(sf::IntRect(j*cletca, i*cletca, cletca, cletca))){//Если столкновение произошло, то отодвигаем перса обратно, когда он не успел наприсоваться
+                x -= dx*time;
+                y -= dy*time;
+            }
+          }
+        }
+      }
+
+
+
+
+    speed = 0;
+    sprite.setPosition(x,y);
+   }
+};
+
+Player hero("hero.png", "no-1.wav", 20, 20, 0, 0);
 
 
 void menu(sf::RenderWindow & window) {
@@ -75,15 +171,11 @@ int main()
 
    sf::View view(sf::FloatRect(0.f, 0.f, WindowWidth, WindowHeight));
 
-   sf::Texture polTexture, heroPlayerTexture;
+   sf::Texture polTexture;
    polTexture.loadFromFile("pol.png");
-   heroPlayerTexture.loadFromFile("ironman.png");
-   sf::Sprite polSprite(polTexture), heroPlayerSptite(heroPlayerTexture);// 32, 48
-   heroPlayerSptite.setTextureRect(sf::IntRect(0,0,32,48));
+   sf::Sprite polSprite(polTexture);// 32, 48
 
    polSprite.setScale(5, 5);
-   heroPlayerSptite.setScale(1.5,1.5);
-
 
 
 
@@ -95,14 +187,7 @@ int main()
         return -1; // error
     music.play();
     music.setLoop(true);
-    music.setVolume(80);
-
-    sf::SoundBuffer buffer;
-    buffer.loadFromFile("no-1.wav");
-
-    sf::Sound sound;
-    sound.setBuffer(buffer);
-
+    music.setVolume(40);
 
     sf::Clock clock;
 
@@ -118,97 +203,51 @@ int main()
        {
            if (event.type == sf::Event::Closed)
                window.close();
-
-           if (sf::Keyboard::isKeyPressed(sf::Keyboard::Escape))
-           {
-             menu(window);
-             window.setView(view);
-           }
-
-           if (sf::Keyboard::isKeyPressed(sf::Keyboard::Left))
-           {
-             //**************проверка врезания в чёрный квадрат
-              for(int i = y / cletca; i< (y+cletca)/cletca;i++){
-                for(int j = x / cletca; j< (x+cletca)/cletca; j++){
-                  if (map[i][j] == 1){
-                    x = j*cletca+cletca+speed*time;
-                    sound.play();
-                  }
-                }
-              }
-
-             dx=-speed*time;
-             dy = 0;
-             heroPlayerFrame += 0.05 * time;
-             if(heroPlayerFrame > 4) heroPlayerFrame = 0;
-             heroPlayerSptite.setTextureRect(sf::IntRect(32*int(heroPlayerFrame), 48, 32, 48));
-           }
-           else if (sf::Keyboard::isKeyPressed(sf::Keyboard::Right))
-           {
-
-             //**************проверка врезания в чёрный квадрат
-              for(int i = y / cletca; i< (y+cletca)/cletca;i++){
-                for(int j = x / cletca; j< (x+cletca)/cletca; j++){
-                  if (map[i][j] == 1){
-                    x = j*cletca-cletca-speed*time;
-                    sound.play();
-                  }
-                }
-              }
-
-             dx=speed*time;
-             dy = 0;
-             heroPlayerFrame += 0.05 * time;
-             if(heroPlayerFrame > 4) heroPlayerFrame = 0;
-             heroPlayerSptite.setTextureRect(sf::IntRect(32*int(heroPlayerFrame), 96, 32, 48));
-           }
-           else if (sf::Keyboard::isKeyPressed(sf::Keyboard::Up))
-           {
-             //**************проверка врезания в чёрный квадрат
-              for(int i = y / cletca; i< (y+cletca)/cletca;i++){
-                for(int j = x / cletca; j< (x+cletca)/cletca; j++){
-                  if (map[i][j] == 1){
-                    y = i*cletca+cletca+speed*time;
-                    sound.play();
-                  }
-                }
-              }
-
-             dy=-speed*time;
-             dx = 0;
-             heroPlayerFrame += 0.05 * time;
-             if(heroPlayerFrame > 4) heroPlayerFrame = 0;
-             heroPlayerSptite.setTextureRect(sf::IntRect(32*int(heroPlayerFrame), 144, 32, 48));
-           }
-           else if (sf::Keyboard::isKeyPressed(sf::Keyboard::Down))
-           {
-             //**************проверка врезания в чёрный квадрат
-              for(int i = y / cletca; i< (y+cletca)/cletca;i++){
-                for(int j = x / cletca; j< (x+cletca)/cletca; j++){
-                  if (map[i][j] == 1){
-                    y = i*cletca-cletca-speed*time;
-                    sound.play();
-                  }
-                }
-              }
-
-             dy=speed*time;
-             dx = 0;
-             heroPlayerFrame += 0.05 * time;
-             if(heroPlayerFrame > 4) heroPlayerFrame = 0;
-             heroPlayerSptite.setTextureRect(sf::IntRect(32*int(heroPlayerFrame), 0, 32, 48));
-           }
-           else {
-             dx = 0;
-             dy = 0;
-           }
        }
 
-       x+=dx;
-       y+=dy;
 
-       int viewx = x+cletca/2;
-       int viewy = y+cletca/2;
+
+       if (sf::Keyboard::isKeyPressed(sf::Keyboard::Escape))
+       {
+         menu(window);
+         window.setView(view);
+       }
+
+       if ((sf::Keyboard::isKeyPressed(sf::Keyboard::Left)) && (sf::Keyboard::isKeyPressed(sf::Keyboard::Up))){
+         hero.chdir(4,0.707);
+       }else
+       if ((sf::Keyboard::isKeyPressed(sf::Keyboard::Right)) && (sf::Keyboard::isKeyPressed(sf::Keyboard::Up))){
+         hero.chdir(5,0.707);
+       }else
+       if((sf::Keyboard::isKeyPressed(sf::Keyboard::Left)) && (sf::Keyboard::isKeyPressed(sf::Keyboard::Down))){
+         hero.chdir(6,0.707);
+       }else
+       if ((sf::Keyboard::isKeyPressed(sf::Keyboard::Right)) && (sf::Keyboard::isKeyPressed(sf::Keyboard::Down))){
+         hero.chdir(7,0.707);
+       }else
+       if (sf::Keyboard::isKeyPressed(sf::Keyboard::Left))
+       {
+         hero.chdir(1,1);
+       }else
+       if (sf::Keyboard::isKeyPressed(sf::Keyboard::Right))
+       {
+         hero.chdir(0,1);
+       }else
+       if (sf::Keyboard::isKeyPressed(sf::Keyboard::Up))
+       {
+         hero.chdir(3,1);
+       }else
+       if (sf::Keyboard::isKeyPressed(sf::Keyboard::Down))
+       {
+         hero.chdir(2,1);
+       } else hero.chdir(-1,0);
+       hero.update(time);
+
+
+
+//**************ПОСТАНОВКА КАМЕРЫ**********************
+       int viewx = hero.x+cletca/2;
+       int viewy = hero.y+cletca/2;
        if (viewx <=  WindowWidth/2){
          viewx = WindowWidth/2;
        }
@@ -222,10 +261,6 @@ int main()
          viewy = cletca*mapHeight-WindowHeight/2;
        }
        view.setCenter(viewx, viewy);
-
-
-
-
 
 
        window.clear();
@@ -246,8 +281,7 @@ int main()
        }
 
 //************** ДЛЯ ГЕРОЯ
-       heroPlayerSptite.setPosition(sf::Vector2f(x, y));
-       window.draw(heroPlayerSptite);
+       window.draw(hero.sprite);
 //************
 
        window.display();
